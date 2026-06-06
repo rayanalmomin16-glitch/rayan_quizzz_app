@@ -1,102 +1,182 @@
 import streamlit as st
+import json
+import os
+import random  # دمج مميزات العشوائية للأسئلة في لغة بايثون
 
-st.title("Stlite Sharing: Serverless Streamlit app platform")
+# 1. إعدادات الصفحة وعنوان التطبيق في المتصفح
+st.set_page_config(page_title="تطبيق ريان الذكي VIP", page_icon="🏎️", layout="centered")
 
-col1, col2 = st.columns(2, vertical_alignment="center", gap="large")
-with col1:
-    pass 
-#    st.image("data/logo.png", use_container_width=True)
-with col2:
-    st.image("https://streamlit.io/images/brand/streamlit-mark-color.svg", use_container_width=True)
+# دالة لقراءة الأسئلة من ملف الـ JSON ومحمية من الـ Cache لضمان التحديث المستمر
+def load_huge_quiz_bank():
+    file_path = "quiz_data.json"
+    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {
+                "⚠️ خطأ في الملف": [{"q": "ملف quiz_data.json يحتوي على خطأ في بنية الـ JSON، يرجى إصلاحه.", "options": ["مفهوم", "تحديث"], "correct": 0}]
+            }
+    else:
+        return {
+            "🚨 الملف مفقود": [{"q": "ملف quiz_data.json غير موجود أو فارغ! يرجى رفعه في نفس المجلد.", "options": ["حسناً", "سأرفعه"], "correct": 0}]
+        }
 
+quiz_bank = load_huge_quiz_bank()
+
+# إعداد الـ CSS المخصص للخلفية والتحسينات البصرية
 st.markdown("""
-### Stlite
-**Stlite** is a port of _Streamlit:streamlit:_ to Wasm, powered by Pyodide,
-that runs completely on web browsers.
+    <style>
+    .stApp {
+        background: linear-gradient(-45deg, #ff9a9e, #fecfef, #a1c4fd, #c2e9fb);
+        background-size: 400% 400%;
+        animation: gradientAnimation 12s ease infinite;
+    }
+    @keyframes gradientAnimation {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    .main-title { 
+        font-size: 45px !important; font-weight: 900; text-align: center; color: #2c3e50; 
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;
+    }
+    .sub-title { 
+        font-size: 22px; text-align: center; color: #34495e; margin-bottom: 30px; font-weight: bold;
+    }
+    .question-box {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 15px !important;
+        padding: 20px !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+        margin-bottom: 15px;
+        border-right: 5px solid #ff4b4b;
+        transition: transform 0.3s ease;
+    }
+    .question-box:hover { transform: translateY(-3px); }
+    
+    div.stButton > button {
+        background: linear-gradient(90deg, #ff4b4b, #ff7676) !important;
+        color: white !important; border: none !important; border-radius: 25px !important;
+        padding: 10px 24px !important; font-weight: bold !important; font-size: 18px !important;
+        box-shadow: 0 4px 10px rgba(255, 75, 75, 0.3) !important; transition: all 0.3s ease !important;
+    }
+    div.stButton > button:hover { transform: scale(1.02) !important; }
+    
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        background-color: rgba(255, 255, 255, 0.7); padding: 15px; border-radius: 12px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-The official repository is [🔗 here](https://github.com/whitphx/stlite).
+st.markdown('<div class="main-title">👑 منظومة ريان المعرفية VIP</div>', unsafe_allow_html=True)
 
-If you are new to Streamlit, read the Getting Started tutorial [🔗 here](https://docs.streamlit.io/library/get-started) first
-(don't worry, it only takes a few minutes 👍),
-but **you can skip the "Installation" section** because you are here 😎.
-You can start writing code right out of the box on this online editor 👈!
-(If there is not an editor on the left, you are seeing the shared app.
-Navigate to the editor mode: https://edit.share.stlite.net/)
+# إدارة الصفحات عبر الـ Session State
+if 'page' not in st.session_state:
+    st.session_state.page = "main_menu"
+if 'selected_category' not in st.session_state:
+    st.session_state.selected_category = None
+if 'sampled_questions' not in st.session_state:
+    st.session_state.sampled_questions = []
 
-### Stlite Sharing
-This page is built on **Stlite Sharing**, an online code editor & sharing platform for _Stlite_. \\
-If you see the editor and preview panes side by side, you are in the editor mode, https://edit.share.stlite.net/. \\
-If you see only this Streamlit app, you are in the sharing mode, https://share.stlite.net/.
-(If you want to edit the app, please go to the [editor mode](https://edit.share.stlite.net/)!)
+if st.session_state.selected_category and st.session_state.selected_category not in quiz_bank:
+    st.session_state.page = "main_menu"
+    st.session_state.selected_category = None
 
-The app code and data are encoded into the URL as a hash like `https://share.stlite.net/#!ChBz...`,
-so you can save, share and restore the app only this the URL.
-If you are on the editor page, click the "Open App" link on the top right toolbar to see the standalone app!
+# --- الصفحة الرئيسية: اختيار القسم ---
+if st.session_state.page == "main_menu":
+    st.markdown('<div class="sub-title">اختر قسماً لتبدأ التحدي والمنافسة في المعلومات فوراً:</div>', unsafe_allow_html=True)
+    
+    chosen_cat = st.radio("🎯 اختر القسم المناسب لتحديك:", options=list(quiz_bank.keys()), index=0)
+    st.markdown("---")
+    
+    if st.button("🚀 ارفع التحدي وابدأ الاختبار الآن", use_container_width=True):
+        st.session_state.selected_category = chosen_cat
+        all_questions = quiz_bank[chosen_cat]
+        num_to_sample = min(5, len(all_questions))
+        st.session_state.sampled_questions = random.sample(all_questions, num_to_sample)
+        st.session_state.user_answers = [None] * num_to_sample
+        st.session_state.page = "quiz_page"
+        st.rerun()
 
-You can switch the editor and sharing modes by replacing the host name in the URL,
-`edit.share.stlite.net` and `share.stlite.net`.
+# --- صفحة الأسئلة والاختبار ---
+elif st.session_state.page == "quiz_page":
+    category = st.session_state.selected_category
+    questions = st.session_state.sampled_questions
+    total_q = len(questions)
+    
+    st.markdown(f'<div class="sub-title">أنت الآن داخل تحدي قسم: <b>{category}</b></div>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    for idx, item in enumerate(questions):
+        st.markdown(f'<div class="question-box"><h3>السؤال {idx + 1}: {item["q"]}</h3></div>', unsafe_allow_html=True)
+        
+        current_index = None
+        if st.session_state.user_answers[idx] in item['options']:
+            current_index = item['options'].index(st.session_state.user_answers[idx])
+            
+        choice = st.radio(
+            label=f"question_label_{idx}",
+            options=item['options'],
+            key=f"quiz_{category}_{idx}",
+            index=current_index,
+            label_visibility="collapsed"
+        )
+        st.session_state.user_answers[idx] = choice
+        st.markdown("---")
+        
+    col_submit, col_back = st.columns(2)
+    
+    if col_submit.button("📝 الحساب وتقديم الإجابات", use_container_width=True):
+        if None in st.session_state.user_answers:
+            st.warning("⚠️ يرجى الإجابة على جميع الأسئلة أولاً قبل تقديم الاختبار!")
+        else:
+            correct_count = 0
+            wrong_questions = []
+            
+            for idx, item in enumerate(questions):
+                user_choice = st.session_state.user_answers[idx]
+                correct_choice = item['options'][item['correct']]
+                
+                if user_choice == correct_choice:
+                    correct_count += 1
+                else:
+                    wrong_questions.append({
+                        "num": idx + 1, "q": item['q'], "user_ans": user_choice, "correct_ans": correct_choice
+                    })
+                    
+            percentage = (correct_count / total_q) * 100
+            st.balloons()
+            st.success("### 🎉 تم اكتمال الاختبار بنجاح!")
+            
+            # تم تعديل هذا الجزء لحل مشكلة col1 التي تسببت في الخطأ
+            st.metric(label="الأسئلة الصحيحة", value=f"{correct_count} / {total_q}")
+            st.metric(label="نسبة نجاحك", value=f"{percentage:.1f}%")
+            st.progress(correct_count / total_q)
+            
+            if percentage == 100:
+                st.snow()
+                st.write("### 🌟 أسطورة حقيقية! إجاباتك مثالية عبقري لا يخطئ!")
+            elif percentage >= 80:
+                st.write("### 👍 رائع جداً! معلوماتك قوية وفي تقدم مستمر.")
+            elif percentage >= 50:
+                st.write("### 😉 نتيجة جيدة! لكن تحتاج إلى بعض التركيز.")
+            else:
+                st.write("### 👎 لا بأس، حاول مجدداً لتطوير قدراتك!")
+                
+            st.markdown("---")
+            
+            if wrong_questions:
+                st.error("### ❌ مراجعة وتصحيح الأخطاء:")
+                for w in wrong_questions:
+                    with st.expander(f"🔍 السؤال {w['num']}: {w['q']}"):
+                        st.markdown(f"**إجابتك:** <span style='color:red; font-weight:bold;'>{w['user_ans']}</span>", unsafe_allow_html=True)
+                        st.markdown(f"**الإجابة الصحيحة:** <span style='color:gree; font-weight:bold;'>{w['correct_ans']}</span>", unsafe_allow_html=True)
+            else:
+                st.success("### 🏆 مبروك! إجاباتك كلها صحيحة 100%.")
 
-### Tell your story!
-When you create some apps with _Stlite_, please share it!
-All you need to do is copy and paste the URL 👍
-
-* **Stlite** GitHub Discussions [🔗 here](https://github.com/whitphx/stlite/discussions/categories/show-and-tell)
-* Streamlit community forum [🔗 here](https://discuss.streamlit.io/)
-""")
-
-st.header("Streamlit Component Samples")
-st.markdown("""
-    All these features are working on your browser!
-""")
-
-name = st.text_input("Your name?")
-st.write("Hello,", name or "world", "!")
-
-value = st.slider("Value?")
-st.write("The slider value is", value)
-
-import numpy as np
-import pandas as pd
-
-
-@st.cache_data
-def get_chart_data():
-    return pd.DataFrame(
-        np.random.randn(20, 3),
-        columns=['a', 'b', 'c']
-    )
-
-
-st.subheader("Chart sample")
-chart_data = get_chart_data()
-
-tab1, tab2, tab3 = st.tabs(["Line chart", "Area chart", "Bar chart"])
-with tab1:
-    st.line_chart(chart_data)
-with tab2:
-    st.area_chart(chart_data)
-with tab3:
-    st.bar_chart(chart_data)
-
-st.subheader("DataFrame sample")
-
-
-@st.cache_data
-def get_sample_df():
-    return pd.DataFrame(
-        np.random.randn(50, 20),
-        columns=('col %d' % i for i in range(20))
-    )
-
-
-df = get_sample_df()
-st.dataframe(df)
-
-st.subheader("Camera input")
-st.info("Don't worry! The photo data is processed on your browser and never uploaded to any remote servers.")
-enable_camera_input = st.checkbox("Use the camera input")
-if enable_camera_input:
-    picture = st.camera_input("Take a picture")
-
-    if picture:
-        st.image(picture)
+    if col_back.button("↩️ العودة للقائمة الرئيسية", use_container_width=True):
+        st.session_state.page = "main_menu"
+        st.session_state.selected_category = None
+        st.session_state.sampled_questions = []
+        st.rerun()
