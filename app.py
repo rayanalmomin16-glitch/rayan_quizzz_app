@@ -4,7 +4,7 @@ st.title("Stlite Sharing: Serverless Streamlit app platform")
 
 col1, col2 = st.columns(2, vertical_alignment="center", gap="large")
 with col1:
-    st.image("data/logo.png", use_container_width=True)
+#    st.image("data/logo.png", use_container_width=True)
 with col2:
     st.image("https://streamlit.io/images/brand/streamlit-mark-color.svg", use_container_width=True)
 
